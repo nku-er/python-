@@ -1,9 +1,15 @@
 # _*_ coding:utf-8 _*_
 import time, urllib.request,requests
 from bs4 import BeautifulSoup
+import openpyxl
 import xlwt
 import peewee
 import IpSpider
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions import NoSuchElementException
+path = r'geckodriver.exe'
+
 
 class JdSpider(object):
     """
@@ -225,7 +231,7 @@ class Excel:
     # 初始化，创建文件及写入title
     def __init__(self, sheet_name='sheet1'):
         # 表头，放到数组中
-        title_label = ['商品编号', '商品名称', '价格', '商家', '商品详情地址', '时间', '关键字']
+        title_label = ['商品编号', '商品名称', '价格', '商家', '商品详情地址', '时间', '是否自营', '关键字']
         self.write_work = xlwt.Workbook(encoding='ascii')
         self.write_sheet = self.write_work.add_sheet(sheet_name)
         for item in range(len(title_label)):
@@ -295,13 +301,40 @@ def get_html(url):
     else:
         print("获取网站信息失败！")
 
-def getInfo(keyword, num):
-    search_url = 'https://search.jd.com/Search?keyword=' + keyword + '&enc=utf-8'
-    html = get_html(search_url)
-    # 初始化BeautifulSoup库,并设置解析器
-    soup = BeautifulSoup(html, 'lxml')
-    # 商品列表
-    goods_list = soup.find_all('li', class_='gl-item')
+def isLimit(addr, num):
+    # https://cart.jd.com/gate.action?pid=53301332796&pcount=158&ptype=1
+    time.sleep(1)
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    # chrome_options.add_argument('--disable-gpu')
+    chrome_options.page_load_strategy = 'none'
+    chrome_options.add_argument('--incognito')
+    chrome_options.add_argument('blink-setting=imagesEnabled=false')
+    chrome_options.add_argument('log_level=3')
+    chrome_options.add_argument('--disable-plugins')
+
+    browser = webdriver.Firefox(executable_path=path, options=chrome_options)
+    browser.get(addr)
+    num1 = browser.find_element_by_xpath('//input[@id="buy-num"]')
+    num1.clear()
+    num1.send_keys(num)
+    # browser.sleep(1)
+    time.sleep(1)
+    result = browser.find_element_by_xpath('//a[@id="InitCartUrl"]').get_attribute("href")
+    # print(result[-4:])
+    browser.quit()
+    if result[-4:] == 'none':
+        return 'fail'
+    else:
+        return 'succ'
+
+def getInfo(keyword, num, ziying, limit):
+    # search_url = 'https://search.jd.com/Search?keyword=' + keyword + '&enc=utf-8&page=1'
+    # html = get_html(search_url)
+    # # 初始化BeautifulSoup库,并设置解析器
+    # soup = BeautifulSoup(html, 'lxml')
+    # # 商品列表
+    # goods_list = soup.find_all('li', class_='gl-item')
     # 打印goods_list到控制台
     count = 0
     goodsname_list = []
@@ -310,31 +343,61 @@ def getInfo(keyword, num):
     goodsshop_list = []
     goodsaddr_list = []
     time_list = []
+    zi_list = []
+    page=0
+    if ziying == 1:
+        keyword+= ' 自营'
 
-    for li in goods_list:  # 遍历父节点
-        # 商品编号
-        no = li['data-sku']
-        # 商品名称
-        name = li.find(class_='p-name p-name-type-2').find('em').get_text()
-        # 价格
-        price = li.find(class_='p-price').find('i').get_text()
-        # 商家
-        shop = li.find(class_='p-shop').find('a').get_text()
-        # 商品详情地址
-        detail_addr = li.find(class_='p-name p-name-type-2').find('a')['href']
-        thistime = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-        goodsname_list.append(name)
-        goodsno_list.append(no)
-        goodsaddr_list.append(detail_addr)
-        goodsshop_list.append(shop)
-        goodsprice_list.append(price)
-        time_list.append(thistime)
-        count += 1
-        if count >= num:
-            break
-    return goodsno_list, goodsname_list, goodsprice_list, goodsshop_list, goodsaddr_list, time_list
+    while count < num:
+        page += 1
+        # 设置搜索关键字与页数 构建网址
+        search_url = 'https://search.jd.com/Search?keyword=' + keyword + '&enc=utf-8' + '&page='+str(page)
+        print('正在搜索第'+str(page)+'页，已获取'+str(count))
+        html = get_html(search_url)
+        # 初始化BeautifulSoup库,并设置解析器
+        soup = BeautifulSoup(html, 'lxml')
+        # 商品列表
+        goods_list = soup.find_all('li', class_='gl-item')
+        for li in goods_list:  # 遍历父节点
+            # 商品编号
+            no = li['data-sku']
+            # 商品名称
+            name = li.find(class_='p-name p-name-type-2').find('em').get_text()
+            # 价格
+            price = li.find(class_='p-price').find('i').get_text()
+            # 商家
+            shop = li.find(class_='p-shop').find('a').get_text()
+            # 商品详情地址
+            detail_addr = li.find(class_='p-name p-name-type-2').find('a')['href']
+            thistime = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+            # 判断限购数量
+            detail_addr = 'http:'+detail_addr
+            limit_flag = isLimit(detail_addr, limit)
+            if limit_flag == 'fail':
+                continue
 
-def database():
+            # 自营
+            if li.find(class_='p-icons') == None or li.find(class_='p-icons').find('i') == None:
+                zi = '非自营'
+            else:
+                zi = li.find(class_='p-icons').find('i').get_text()
+            # print(zi)
+            if (zi == "自营" and ziying == 1) or (zi != "自营" and ziying == 0):
+                goodsname_list.append(name)
+                goodsno_list.append(no)
+                goodsaddr_list.append(detail_addr)
+                goodsshop_list.append(shop)
+                goodsprice_list.append(price)
+                time_list.append(thistime)
+                zi_list.append(zi)
+                # print(goodsname_list)
+                # 计算已经爬取得到的数目
+                count += 1
+                if count >= num:
+                    break
+    return goodsno_list, goodsname_list, goodsprice_list, goodsshop_list, goodsaddr_list, time_list, zi_list
+
+def database(txtName):
     Jd_Mysql = JdMysql()
     Jd_Model = Jd_Mysql.Table()
     with open(txtName, 'r', encoding='utf-8') as file:
@@ -342,7 +405,11 @@ def database():
             line = line.strip('\n')
             keyword = line.split()[0]
             num = int(line.split()[1])
-            goodsno_list, goodsname_list, goodsprice_list, goodsshop_list, goodsaddr_list, time_list = getInfo(keyword, num)
+            ziying = int(line.split()[2])
+            limit_purchase_num = int(line.split()[3])
+            goodsno_list, goodsname_list, goodsprice_list, goodsshop_list, goodsaddr_list, time_list, zi_list = getInfo(keyword, num, ziying, limit_purchase_num)
+
+            # goodsno_list, goodsname_list, goodsprice_list, goodsshop_list, goodsaddr_list, time_list = getInfo(keyword, num, ziying, limit_purchase_num)
             goodsArr = {
                 'goods_no': goodsno_list,
                 'goods_name': goodsname_list,
@@ -365,53 +432,48 @@ def database():
                     keyword = keyword
                 )
 
+def save_XLS(txtName):
+    # excel = openpyxl.load_workbook(dj_data)
+    excel = Excel()
+    with open(txtName, 'r', encoding='utf-8') as file:
+        for line in file:
+
+            line = line.strip('\n')
+            # 每一行构成为：关键字 数量 是否自营 限制购买数量
+            keyword = line.split()[0]
+            num = int(line.split()[1])
+            ziying = int(line.split()[2])
+            limit_purchase_num = int(line.split()[3])
+            goodsno_list, goodsname_list, goodsprice_list, goodsshop_list, goodsaddr_list, time_list, zi_list = getInfo(keyword, num, ziying, limit_purchase_num)
+            goodsArr = {
+                'goods_no': goodsno_list,
+                'goods_name': goodsname_list,
+                # 'goods_img': goodsimg_list,
+                'goods_price': goodsprice_list,
+                'goods_sql_addtime': str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
+                'goods_url': goodsaddr_list,
+                'goods_shop': goodsshop_list,
+                'goods_icon': zi_list
+            }
+            for (no, name, price, shop, url, zi) in zip(goodsArr['goods_no'], goodsArr['goods_name'], goodsArr['goods_price'],
+                                                goodsArr['goods_shop'], goodsArr['goods_url'], goodsArr['goods_icon']):
+                goods = [no, name, price, shop, url, goodsArr['goods_sql_addtime'], zi, keyword]
+                # print('111')
+                excel.write_content(goods)
+            excel.write_work.save("dj_data.xls")
 
 if __name__ == '__main__':
+    # save_XLS('wula.txt')
+
+
     # 目标输入
     print('程序输入为文本文档，请将输入目标txt文档置于程序同目录下，文档格式为每一行为[关键字 爬取数量]\n如：\n\t白酒 4\n\t牛奶 5')
     txtName = input('请输入文档名称：')
     selection = int(input('选择结果保存方式：\n\t1. 直接保存为xls表格\n\t2. 保存到数据库\n请输入：'))
     if selection != 2:
         print("结果将保存在本目录下的dj_data.xls")
-        excel = Excel()
-        with open(txtName, 'r', encoding='utf-8') as file:
-            for line in file:
-                line = line.strip('\n')
-                keyword = line.split()[0]
-                num = int(line.split()[1])
-                # 搜索地址
-                search_url = 'https://search.jd.com/Search?keyword=' + keyword + '&enc=utf-8'
-                html = get_html(search_url)
-                # 初始化BeautifulSoup库,并设置解析器
-                soup = BeautifulSoup(html, 'lxml')
-                # 商品列表
-                goods_list = soup.find_all('li', class_='gl-item')
-                # 打印goods_list到控制台
-                count = 0
-                for li in goods_list:  # 遍历父节点
-                    # 商品编号
-                    no = li['data-sku']
-                    # 商品名称
-                    name = li.find(class_='p-name p-name-type-2').find('em').get_text()
-                    # 图片路径
-                    # img_url = li.find(class_='p-img').find('img')['src']
-                    # 价格
-                    price = li.find(class_='p-price').find('i').get_text()
-                    # 商家
-                    shop = li.find(class_='p-shop').find('a').get_text()
-                    # 商品详情地址
-                    detail_addr = li.find(class_='p-name p-name-type-2').find('a')['href']
-                    # 评价数量
-                    comment_num = li.find(class_='p-commit').find('a').get_text()
-                    thistime = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-                    # 将商品信息放入数组中，再传到写入文件函数
-                    goods = [no, name, price, shop, detail_addr, thistime, keyword]
-                    excel.write_content(goods)
-                    count += 1
-                    if count >= num:
-                        break
-        excel.write_work.save("dj_data.xls")
+        save_XLS(txtName)
     else:
         print("将使用数据库保存")
-        database()
+        database(txtName)
     print('end')
