@@ -14,6 +14,10 @@ path = r'geckodriver.exe'
 class JdSpider(object):
     """
         创建爬虫类
+        __init__
+            ->  load_page
+            ->  load_one (得到网页源代码)
+            ->  get_goods_info(得到需要的信息)
     """
 
     def __init__(self, Jd_mysql, data, proxy=True):
@@ -106,6 +110,8 @@ class JdSpider(object):
             url_link = 'https:' + url['href'].rsplit("//'", 1)[-1]  # 图片名
             goodsurl_list.append(url_link)
 
+        # TODO: 如果需要增加另外获得信息，可以在此处添加，然后加入到goodsArr中，并返回
+
         goodsArr = {
             'goods_name': goodsname_list,
             # 'goods_img': goodsimg_list,
@@ -119,6 +125,7 @@ class JdSpider(object):
 
     def get_goods_params(self, url):
         """
+        在实际中未使用此函数。
         获取商品参数
         :param goodsArr: 商品基本信息
         :return: 单个商品完整信息
@@ -151,7 +158,7 @@ class JdSpider(object):
 
     def insert_goods_sql(self, Ant, goodsArr):
         """
-        添加爬虫爬取的商品数据
+        添加爬虫爬取的商品数据到数据库中
         :param Ant: 实例化的peewee表对象
         :param goodsArr: 获取的商品集合
         :param self.param['goods_count']: 商品的个数
@@ -160,17 +167,12 @@ class JdSpider(object):
         for (name, price, sale, url) in zip(goodsArr['goods_name'], goodsArr['goods_price'],
                                                  goodsArr['goods_sale'], goodsArr['goods_url']):
             print('正在获取第 ',str(self.param['goods_count']),' 件商品的信息： 商品名称- ',name)
-            # goods_param = self.get_goods_params(url)
-            # print(goods_param['goods_pcate'])
             Ant.create(
                 goods_name=name,
                 # goods_img=img,
                 goods_price=price,
                 goods_sale=sale,
                 goods_url=url,
-                # goods_pcate="随便",
-                # goods_brand=goods_param['goods_brand'],
-                # goods_shop=goods_param['goods_shop'],
                 goods_sql_addtime=goodsArr['goods_sql_addtime']
             )
             self.param['goods_count'] = self.param['goods_count'] + 1
@@ -251,6 +253,11 @@ class Excel:
             print("文件保存失败！")
 
 class JdMysql(object):
+    '''
+    数据库类
+        使用__init__初始化，输入数据库信息进行连接
+        需要在数据库中创建与Table中相同的数据库表
+    '''
     def __init__(self):
         dbname = input("请输入数据库名：")
         user = input("请输入用户名：")
@@ -272,9 +279,10 @@ class JdMysql(object):
         )
     def Table(self,table='jdtable'):
         class jdtable(peewee.Model):
-            goods_id = peewee.CharField(max_length=30)
-            goods_name = peewee.CharField(max_length=200)
-            goods_price = peewee.CharField(max_length=30)
+            # 数据库表
+            goods_id = peewee.CharField(max_length=30) # id
+            goods_name = peewee.CharField(max_length=200)  # 商品名
+            goods_price = peewee.CharField(max_length=30)  # 价格
             # goods_sale = peewee.CharField(max_length=30)
             goods_shop = peewee.CharField(max_length=150)
             goods_url = peewee.CharField(max_length=255)
@@ -302,6 +310,15 @@ def get_html(url):
         print("获取网站信息失败！")
 
 def isLimit(addr, num):
+    '''
+    本函数用于根据输入的商品限购数量进行限制。
+    如数量为1，则意味着当商品限购小于1，则认为其可能是秒杀物品，不进行考虑
+    由于本函数中使用的selenium访问浏览器收到网速等限制，本函数运行速度较慢
+    TODO： 事实上，从搜索处搜索到的商品基本都不会是秒杀商品，因此可以在实际使用中不用此函数。
+    :param addr: 网址
+    :param num: 数量
+    :return: fail  succ
+    '''
     # https://cart.jd.com/gate.action?pid=53301332796&pcount=158&ptype=1
     time.sleep(1)
     chrome_options = Options()
@@ -312,7 +329,7 @@ def isLimit(addr, num):
     chrome_options.add_argument('blink-setting=imagesEnabled=false')
     chrome_options.add_argument('log_level=3')
     chrome_options.add_argument('--disable-plugins')
-
+    # TODO：模拟火狐浏览器，需要下载对应驱动
     browser = webdriver.Firefox(executable_path=path, options=chrome_options)
     browser.get(addr)
     num1 = browser.find_element_by_xpath('//input[@id="buy-num"]')
@@ -323,19 +340,21 @@ def isLimit(addr, num):
     result = browser.find_element_by_xpath('//a[@id="InitCartUrl"]').get_attribute("href")
     # print(result[-4:])
     browser.quit()
+    # 如果符合要求，则返回succ
     if result[-4:] == 'none':
         return 'fail'
     else:
         return 'succ'
 
 def getInfo(keyword, num, ziying, limit):
-    # search_url = 'https://search.jd.com/Search?keyword=' + keyword + '&enc=utf-8&page=1'
-    # html = get_html(search_url)
-    # # 初始化BeautifulSoup库,并设置解析器
-    # soup = BeautifulSoup(html, 'lxml')
-    # # 商品列表
-    # goods_list = soup.find_all('li', class_='gl-item')
-    # 打印goods_list到控制台
+    '''
+    获得商品信息
+    :param keyword: 关键字
+    :param num: 数量
+    :param ziying: 是否自营
+    :param limit: 限购数量
+    :return: 商品信息
+    '''
     count = 0
     goodsname_list = []
     goodsno_list = []
@@ -372,7 +391,9 @@ def getInfo(keyword, num, ziying, limit):
             thistime = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
             # 判断限购数量
             detail_addr = 'http:'+detail_addr
-            limit_flag = isLimit(detail_addr, limit)
+            # TODO：按照isLimit()函数中所说，可以不使用isLimit，即将以下语句注释。
+            # limit_flag = isLimit(detail_addr, limit)
+            limit_flag = 'succ'
             if limit_flag == 'fail':
                 continue
 
@@ -382,7 +403,9 @@ def getInfo(keyword, num, ziying, limit):
             else:
                 zi = li.find(class_='p-icons').find('i').get_text()
             # print(zi)
+            # 如果自营要求满足
             if (zi == "自营" and ziying == 1) or (zi != "自营" and ziying == 0):
+                # 将信息添加到list
                 goodsname_list.append(name)
                 goodsno_list.append(no)
                 goodsaddr_list.append(detail_addr)
@@ -398,6 +421,7 @@ def getInfo(keyword, num, ziying, limit):
     return goodsno_list, goodsname_list, goodsprice_list, goodsshop_list, goodsaddr_list, time_list, zi_list
 
 def database(txtName):
+    # 数据库类调用
     Jd_Mysql = JdMysql()
     Jd_Model = Jd_Mysql.Table()
     with open(txtName, 'r', encoding='utf-8') as file:
@@ -421,6 +445,7 @@ def database(txtName):
             }
             for (no, name, price, shop, url) in zip(goodsArr['goods_no'], goodsArr['goods_name'], goodsArr['goods_price'],
                                                 goodsArr['goods_shop'], goodsArr['goods_url']):
+                # 插入到数据库
                 Jd_Model.create(
                     goods_id = no,
                     goods_name=name,
@@ -459,12 +484,11 @@ def save_XLS(txtName):
                                                 goodsArr['goods_shop'], goodsArr['goods_url'], goodsArr['goods_icon']):
                 goods = [no, name, price, shop, url, goodsArr['goods_sql_addtime'], zi, keyword]
                 # print('111')
+                # xls
                 excel.write_content(goods)
             excel.write_work.save("dj_data.xls")
 
 if __name__ == '__main__':
-    # save_XLS('wula.txt')
-
 
     # 目标输入
     print('程序输入为文本文档，请将输入目标txt文档置于程序同目录下，文档格式为每一行为[关键字 爬取数量]\n如：\n\t白酒 4\n\t牛奶 5')
@@ -472,8 +496,10 @@ if __name__ == '__main__':
     selection = int(input('选择结果保存方式：\n\t1. 直接保存为xls表格\n\t2. 保存到数据库\n请输入：'))
     if selection != 2:
         print("结果将保存在本目录下的dj_data.xls")
+        # 保存到xls文档
         save_XLS(txtName)
     else:
         print("将使用数据库保存")
+        # 保存到数据库
         database(txtName)
     print('end')
