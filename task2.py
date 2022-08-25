@@ -10,14 +10,24 @@ from urllib.error import HTTPError
 from bs4 import BeautifulSoup
 import urllib.parse
 import requests
+import xlwt
 
 # key = ''
 basic = ''
 pages = set()
 count = 0
 MaxDepth = 100
+result = 'result.txt'
+#使用workbook方法，创建一个新的工作簿
+book = xlwt.Workbook(encoding='utf-8',style_compression=0)
+#添加一个sheet，名字为mysheet，参数overwrite就是说可不可以重复写入值，就是当单元格已经非空，你还要写入
+sheet = book.add_sheet('mysheet',cell_overwrite_ok=True)
 
 def separate(url):
+    '''
+    用于从给的网址中提取的函数
+    如：http://a.com/a ->a.com
+    '''
     if '//' in url:
         url = url.split('//')[1]
     if '/' in url:
@@ -35,6 +45,7 @@ def getUrl(url: str):
     head = {}
     head['User-Agent'] = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:51.0) Gecko/20100101 Firefox/51.0'
     head['Accept'] = 'application/json, text/javascript, */*; q=0.01'
+    # 以下设置的data无用
     data['type'] = 'AUTO'
     # data['i'] = input_data
     data['doctype'] = 'json'
@@ -60,29 +71,17 @@ def getUrl(url: str):
     except ValueError:
         return None
     return bsObj
-    # headers = {
-    #     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-    #                   'AppleWebKit/537.36 (KHTML, like Gecko) '
-    #                   'Chrome/81.0.4044.138 Safari/537.36',
-    #     'accept-language': 'zh-CN,zh;q=0.9'
-    # }
-    # print("--> 正在获取网站信息")
-    # response = requests.get(url, headers=headers)  # 请求访问网站
-    # if response.status_code == 200:
-    #     html = response.text  # 获取网页源码
-    #     return html  # 返回网页源码
-    # else:
-    #     print("获取网站信息失败！")
-    #     return None
 
 def zhuanyi(url):
+    '''
+    用于将网页中的href部分中的网址中的特殊符号删去
+    如 \na.com-->a.com
+    '''
     new = eval(repr(url).replace(f'\\n', ''))
     new = eval(repr(new).replace(f'\\t', ''))
     new = eval(repr(new).replace(f'\\c', ''))
     return new
 
-# base_url = ''
-# url = ''
 def getMorePages(base_url, relative_url: str = ""):
     '''
     获取更多页面
@@ -90,12 +89,21 @@ def getMorePages(base_url, relative_url: str = ""):
         :param relative_url 相对路径 URL
         :return None 失败
     '''
+    # f = open(result, 'w')
     global pages_error_count  # 访问出错页面计数器
     global count  # 用于限制递归深度
     global pages  # 采集过的页面
     global key
-    count += 1
+    # global row
+    # count += 1
+    # 每获得10个保存一次结果
+    if count%10 == 0:
+        print('yes')
+        book.save('test.xls')
+
     if count == MaxDepth:
+        # 最大值可提前设置，达到最大值后强制停止
+        book.save('test.xls')
         return None
     # 拼接url，第一次默认为只有base_url
     url = urljoin(base_url, relative_url)
@@ -104,12 +112,17 @@ def getMorePages(base_url, relative_url: str = ""):
         pages_error_count += 1  # 失败页面计数
         print('bsObj none')
         return None
-
-    if key in bsObj.text:
+    
+    # 如果页面中出现关键字且页面未被记录过
+    if key in bsObj.text and url not in pages:
+        sheet.write(count+1, 0, str(url))
+        # 获取网页title
+        title = bsObj.find('title').text.strip()
+        sheet.write(count+1, 1, title)
+        count += 1
         print(url)
+
     pages.add(url)  # 保存处理过的页面
-    print(pages)
-    # base_url = url
     for link in bsObj.findAll('a'):
         if 'href' in link.attrs:
             # 如果找到新的链接
@@ -119,6 +132,7 @@ def getMorePages(base_url, relative_url: str = ""):
             if newUrl not in pages:
                 new = separate(newUrl)
                 if basic != new:
+                    # 如果获得新的页面不是要求的域名
                     continue
                 newObj = getUrl(newUrl)
                 if newObj == None:
@@ -129,16 +143,21 @@ def getMorePages(base_url, relative_url: str = ""):
                 getMorePages(url, nn)
 
 if __name__ == '__main__':
-    key = '年定报服务'
+    # key = '年定报服务'
     print('start..')
+    key = input("请输入关键字：")
     pages = set()  # 处理过的页面
     agent_list = []  # 保存采集到的代理数据
     pages_error_count = 0  # 访问出错页面计数器
 
-    base_url = 'https://stats.tj.gov.cn'
+    # base_url = 'https://stats.tj.gov.cn'
+    base_url = input('请输入网址：')
     print(f"目标：{base_url}")
     basic = separate(base_url)
     print(basic)
-    getMorePages(base_url)
-
+    # 写入excel第一行
+    sheet.write(0,0,'网址')
+    sheet.write(0,1,'标题')
+    sheet.write(0,2,'日期')
+    getMorePages('https://' + basic)
     # print(zhuanyi(base_url))
