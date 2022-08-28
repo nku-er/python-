@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 import urllib.parse
 import requests
 import xlwt
+from weibo import wb
 
 # key = ''
 basic = ''
@@ -24,14 +25,12 @@ book = xlwt.Workbook(encoding='utf-8',style_compression=0)
 sheet = book.add_sheet('mysheet',cell_overwrite_ok=True)
 
 def separate(url):
-    '''
-    用于从给的网址中提取的函数
-    如：http://a.com/a ->a.com
-    '''
+    # 将http:// 删去
     if '//' in url:
         url = url.split('//')[1]
-    if '/' in url:
-        url = url.split('/')[0]
+    # 将第一个'/'后的部分删去
+    # if '/' in url:
+    #     url = url.split('/')[0]
     return url
 
 def getUrl(url: str):
@@ -45,7 +44,6 @@ def getUrl(url: str):
     head = {}
     head['User-Agent'] = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:51.0) Gecko/20100101 Firefox/51.0'
     head['Accept'] = 'application/json, text/javascript, */*; q=0.01'
-    # 以下设置的data无用
     data['type'] = 'AUTO'
     # data['i'] = input_data
     data['doctype'] = 'json'
@@ -73,15 +71,14 @@ def getUrl(url: str):
     return bsObj
 
 def zhuanyi(url):
-    '''
-    用于将网页中的href部分中的网址中的特殊符号删去
-    如 \na.com-->a.com
-    '''
     new = eval(repr(url).replace(f'\\n', ''))
     new = eval(repr(new).replace(f'\\t', ''))
     new = eval(repr(new).replace(f'\\c', ''))
     return new
 
+# base_url = ''
+# url = ''
+# row = 0
 def getMorePages(base_url, relative_url: str = ""):
     '''
     获取更多页面
@@ -96,13 +93,11 @@ def getMorePages(base_url, relative_url: str = ""):
     global key
     # global row
     # count += 1
-    # 每获得10个保存一次结果
     if count%10 == 0:
         print('yes')
         book.save('test.xls')
 
     if count == MaxDepth:
-        # 最大值可提前设置，达到最大值后强制停止
         book.save('test.xls')
         return None
     # 拼接url，第一次默认为只有base_url
@@ -112,8 +107,7 @@ def getMorePages(base_url, relative_url: str = ""):
         pages_error_count += 1  # 失败页面计数
         print('bsObj none')
         return None
-    
-    # 如果页面中出现关键字且页面未被记录过
+
     if key in bsObj.text and url not in pages:
         sheet.write(count+1, 0, str(url))
         # 获取网页title
@@ -132,7 +126,6 @@ def getMorePages(base_url, relative_url: str = ""):
             if newUrl not in pages:
                 new = separate(newUrl)
                 if basic != new:
-                    # 如果获得新的页面不是要求的域名
                     continue
                 newObj = getUrl(newUrl)
                 if newObj == None:
@@ -142,22 +135,28 @@ def getMorePages(base_url, relative_url: str = ""):
 
                 getMorePages(url, nn)
 
+
 if __name__ == '__main__':
     # key = '年定报服务'
     print('start..')
-    key = input("请输入关键字：")
-    pages = set()  # 处理过的页面
-    agent_list = []  # 保存采集到的代理数据
-    pages_error_count = 0  # 访问出错页面计数器
+    choice = input('是否直接进入微博搜索（若选择微博搜索，请确保已经配置json文件，将不再进行关键字和网址的输入（y/n)：')
+    if choice == 'y' or choice == 'Y':
+        wb()
+    else:
+        print('进入常规搜索')
+        key = input("请输入关键字：")
+        pages = set()  # 处理过的页面
+        agent_list = []  # 保存采集到的代理数据
+        pages_error_count = 0  # 访问出错页面计数器
 
-    # base_url = 'https://stats.tj.gov.cn'
-    base_url = input('请输入网址：')
-    print(f"目标：{base_url}")
-    basic = separate(base_url)
-    print(basic)
-    # 写入excel第一行
-    sheet.write(0,0,'网址')
-    sheet.write(0,1,'标题')
-    sheet.write(0,2,'日期')
-    getMorePages('https://' + basic)
-    # print(zhuanyi(base_url))
+        # base_url = 'https://stats.tj.gov.cn'
+        base_url = input('请输入网址：')
+        print(f"目标：{base_url}")
+        basic = separate(base_url)
+        # print(basic)
+
+        sheet.write(0,0,'网址')
+        sheet.write(0,1,'标题')
+        sheet.write(0,2,'日期')
+        getMorePages('https://' + basic)
+    # fromMainToMore('https://'+basic)
