@@ -13,3 +13,14 @@ task2.py为第二个任务的文件，即在给定域名下搜索相关关键字
 #### 2. 在微博搜索框中输入关键字进行搜索，并在界面按下“`shift`+ `ctrl`+`i`”。
 
 ![图片](https://user-images.githubusercontent.com/68672834/187065052-69ef23e1-7b09-4477-ba52-5f02a8f2c52b.png)
+
+#### 3. 找到如下内容
+选择`network`->刷新页面->在右侧`name`下找到`weibo?q=`字样
+![图片](https://user-images.githubusercontent.com/68672834/187065197-40c1492c-ec94-4a56-90cc-6d8cd4a2a68f.png)
+
+#### 4. 找到cookie
+单击`weibo?q=`，在`Request Headers`下找到cookie 和 user-agent，复制内容到config.json文件中。
+![图片](https://user-images.githubusercontent.com/68672834/187065340-3e1c1958-1f70-4e82-bf77-257fe569bd74.png)
+![图片](https://user-images.githubusercontent.com/68672834/187065377-950520fd-bb48-43a0-ac18-2a852e848e48.png)
+
+#### 5. 在json文件中设置最大页数和关键字，运行。
