@@ -24,3 +24,13 @@ task2.py为第二个任务的文件，即在给定域名下搜索相关关键字
 ![图片](https://user-images.githubusercontent.com/68672834/187065377-950520fd-bb48-43a0-ac18-2a852e848e48.png)
 
 #### 5. 在json文件中设置最大页数和关键字，运行。
+
+
+## 示例结果
+
+#### 1. 京东商品信息
+![图片](https://user-images.githubusercontent.com/68672834/187065604-cb3e28cb-8f66-4f77-99d1-2ac23bda0b10.png)
+
+#### 2. 网址/微博关键字
+![图片](https://user-images.githubusercontent.com/68672834/187065644-fe02da8a-0414-4419-9c51-010ae98dadc1.png)
+![图片](https://user-images.githubusercontent.com/68672834/187065617-0d1f76f4-311f-4c4d-8cb3-9431d093ada8.png)
