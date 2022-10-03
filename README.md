@@ -1,4 +1,7 @@
 # python-
+
+任务1文件包括：Spider_main.py，spider_input.txt，IpSpider.py
+
 Spider_main.py为程序  京东爬虫
 
 spider_input.txt为程序Spider_main.py的输入文件，可更改
