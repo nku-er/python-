@@ -12,6 +12,7 @@ import urllib.parse
 import requests
 import xlwt
 from weibo import wb
+import json
 
 # key = ''
 basic = ''
@@ -29,8 +30,8 @@ def separate(url):
     if '//' in url:
         url = url.split('//')[1]
     # 将第一个'/'后的部分删去
-    # if '/' in url:
-    #     url = url.split('/')[0]
+    if '/' in url:
+        url = url.split('/')[0]
     return url
 
 def getUrl(url: str):
@@ -87,6 +88,7 @@ def getMorePages(base_url, relative_url: str = ""):
         :return None 失败
     '''
     # f = open(result, 'w')
+
     global pages_error_count  # 访问出错页面计数器
     global count  # 用于限制递归深度
     global pages  # 采集过的页面
@@ -94,12 +96,12 @@ def getMorePages(base_url, relative_url: str = ""):
     # global row
     # count += 1
     if count%10 == 0:
-        print('yes')
+        print('采集',count)
         book.save('test.xls')
 
     if count == MaxDepth:
         book.save('test.xls')
-        return None
+        return 1
     # 拼接url，第一次默认为只有base_url
     url = urljoin(base_url, relative_url)
     bsObj = getUrl(url) # 返回一个bs对象
@@ -133,7 +135,10 @@ def getMorePages(base_url, relative_url: str = ""):
                     pages_error_count += 1  # 失败页面计数
                     continue  # 返回到循环开始处
 
-                getMorePages(url, nn)
+                re = getMorePages(url, nn)
+                if re == 1 or count == MaxDepth:
+                    book.save('test.xls')
+                    return None
 
 
 if __name__ == '__main__':
@@ -151,12 +156,14 @@ if __name__ == '__main__':
 
         # base_url = 'https://stats.tj.gov.cn'
         base_url = input('请输入网址：')
+        MaxDepth = int(input('请输入最大页面数量：'))
         print(f"目标：{base_url}")
         basic = separate(base_url)
         # print(basic)
 
         sheet.write(0,0,'网址')
         sheet.write(0,1,'标题')
-        sheet.write(0,2,'日期')
+        # sheet.write(0,2,'日期')
         getMorePages('https://' + basic)
+
     # fromMainToMore('https://'+basic)
