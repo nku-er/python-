@@ -1,9 +1,12 @@
+#-*- coding: utf-8 -*-
 import socket
 import re
 from tkinter.messagebox import NO
 from types import coroutine
 from typing import Counter
 from urllib.request import urlopen
+from urllib.parse import quote
+import string
 from urllib.parse import urljoin
 from urllib.request import Request
 from urllib.error import HTTPError
@@ -56,15 +59,17 @@ def getUrl(url: str):
     data = urllib.parse.urlencode(data).encode('utf-8')
     # req = urllib.request.urlopen(url,data,head)  加了header 直接用urlopen会报错
     req = Request(url,data=None, headers=head)
+    print("?:", url)
     try:
-        html = urlopen(req, timeout=1)
+        s = quote(url, safe=string.printable)
+        html = urlopen(s, timeout=1)
     except HTTPError as e:
         return None
     except socket.error as e:
         return None
 
     try:
-        bsObj = BeautifulSoup(html.read(), 'html.parser')
+        bsObj = BeautifulSoup(html.read(), 'html.parser',from_encoding="iso-8859-1")
     except AttributeError as e:
         return None
     except ValueError:
@@ -80,6 +85,7 @@ def zhuanyi(url):
 # base_url = ''
 # url = ''
 # row = 0
+a = 0
 def getMorePages(base_url, relative_url: str = ""):
     '''
     获取更多页面
@@ -93,9 +99,11 @@ def getMorePages(base_url, relative_url: str = ""):
     global count  # 用于限制递归深度
     global pages  # 采集过的页面
     global key
+    global a
     # global row
     # count += 1
-    if count%10 == 0:
+    if count%10 == 0 and count != a:
+        a = count
         print('采集',count)
         book.save('test.xls')
 
@@ -116,9 +124,11 @@ def getMorePages(base_url, relative_url: str = ""):
         title = bsObj.find('title').text.strip()
         sheet.write(count+1, 1, title)
         count += 1
+        # print(key,bsObj.text)
         print(url)
 
     pages.add(url)  # 保存处理过的页面
+    # print(pages)
     for link in bsObj.findAll('a'):
         if 'href' in link.attrs:
             # 如果找到新的链接
